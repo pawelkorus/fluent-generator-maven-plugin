@@ -8,17 +8,17 @@ import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
-public class FilteringProcessor extends DelegatingProcessor<CtClass<?>> {
+public class FilteringProcessor<E extends CtClass<?>> extends DelegatingProcessor<E> {
 
-	private List<Pattern> includePatterns = Collections.emptyList();
+	private List<Pattern> includePatterns = Collections.singletonList(Pattern.compile(".*"));
 	private List<Pattern> excludePatterns = Collections.emptyList();
 
-	FilteringProcessor(Processor<CtClass<?>> targetProcessor) {
+	FilteringProcessor(Processor<E> targetProcessor) {
 		super(targetProcessor);
 	}
 
 	@Override
-	public void process(CtClass<?> element) {
+	public void process(E element) {
 		String qualifiedName = element.getQualifiedName();
 
 		if(includePatterns.stream().anyMatch(pattern -> pattern.matcher(qualifiedName).matches())) {
