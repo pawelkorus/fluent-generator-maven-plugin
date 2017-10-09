@@ -1,8 +1,6 @@
 package fluentgenerator.mojo;
 
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.Setter;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -10,9 +8,13 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import spoon.Launcher;
 import spoon.reflect.declaration.CtClass;
+import spoon.reflect.declaration.CtInterface;
+import spoon.reflect.declaration.CtType;
 import spoon.reflect.reference.CtTypeReference;
 
+import java.nio.file.Paths;
 import java.util.Date;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -28,6 +30,7 @@ public class GeneratorInterfaceBuilderProcessorTest {
 	@BeforeClass
 	public static void beforeClass() {
 		launcher = new Launcher();
+		launcher.addInputResource(Paths.get("src/test/resources").toString());
 		launcher.getEnvironment().setAutoImports(false);
 		launcher.getEnvironment().setNoClasspath(true);
 		launcher.buildModel();
@@ -40,34 +43,27 @@ public class GeneratorInterfaceBuilderProcessorTest {
 
 	@Test
 	public void shouldCreateGeneratorInterfaceFromPOJOSetters() {
-		CtClass<TestClass1> testClass1CtClass = launcher.getFactory().Class().get(TestClass1.class);
-		generatorInterfaceBuilderProcessor.onInterfaceGenerated(ctInterface -> {
+		performTestOnClassWithAssertions("TestClass1", ctInterface -> {
 			assertThat(ctInterface)
 				.hasMethod("property1", createCtTypeReference(Supplier.class, String.class))
 				.hasMethod("property2", createCtTypeReference(Supplier.class, Integer.class))
 				.hasMethod("build");
 		});
-
-		generatorInterfaceBuilderProcessor.process(testClass1CtClass);
 	}
 
 	@Test
 	public void shouldCreateGeneratorInterfaceFromLombokDataPOJO() {
-		CtClass<TestClass2> testClass2CtClass = launcher.getFactory().Class().get(TestClass2.class);
-		generatorInterfaceBuilderProcessor.onInterfaceGenerated(ctInterface -> {
+		performTestOnClassWithAssertions("TestClass2", ctInterface -> {
 			assertThat(ctInterface)
 				.hasMethod("property1", createCtTypeReference(Supplier.class, String.class))
 				.hasMethod("property2", createCtTypeReference(Supplier.class, Integer.class))
 				.hasMethod("build");
 		});
-
-		generatorInterfaceBuilderProcessor.process(testClass2CtClass);
 	}
 
 	@Test
 	public void shouldCreateGeneratorInterfaceFromLombokSetters() {
-		CtClass<TestClass3> testClass = launcher.getFactory().Class().get(TestClass3.class);
-		generatorInterfaceBuilderProcessor.onInterfaceGenerated(ctInterface -> {
+		performTestOnClassWithAssertions("TestClass3", ctInterface -> {
 			assertThat(ctInterface)
 				.hasMethod("property1", createCtTypeReference(Supplier.class, String.class))
 				.hasMethod("property2", createCtTypeReference(Supplier.class, Integer.class))
@@ -75,31 +71,33 @@ public class GeneratorInterfaceBuilderProcessorTest {
 				.hasMethod("build")
 				.hasNotMethod("property3", createCtTypeReference(Supplier.class, String.class));
 		});
-
-		generatorInterfaceBuilderProcessor.process(testClass);
-	}
-
-	private static class TestClass1 {
-		public void setProperty1(String v) {}
-		public void setProperty2(int v) {}
-	}
-
-	@Data
-	private static class TestClass2 {
-		String property1;
-		int property2;
-	}
-
-	private static class TestClass3 {
-		@Setter String property1;
-		@Setter int property2;
-		@Setter(AccessLevel.PRIVATE) String property3;
-		@Setter(AccessLevel.PUBLIC) Date property4;
 	}
 
 	private CtTypeReference<?> createCtTypeReference(Class<?> type, Class<?>... generics) {
 		CtTypeReference supplierType = launcher.getFactory().createCtTypeReference(type);
 		Stream.of(generics).forEach(g -> supplierType.addActualTypeArgument(launcher.getFactory().createCtTypeReference(g)));
 		return supplierType;
+	}
+
+	private CtClass<?> findClass(String name) {
+		CtType<?> type = launcher.getModel().getAllTypes().stream()
+			.filter(ctType -> ctType.getSimpleName().compareTo(name) == 0).findFirst().orElse(null);
+
+		if(type == null) {
+			Assert.fail("Can't find type " + name);
+		}
+
+		if(!(type instanceof CtClass<?>)) {
+			Assert.fail("Requested type is not a CtClass<?> type");
+		}
+
+		return (CtClass<?>) type;
+
+	}
+
+	private void performTestOnClassWithAssertions(String name, Consumer<CtInterface<?>> assertions) {
+		CtClass<?> testClass = findClass(name);
+		generatorInterfaceBuilderProcessor.onInterfaceGenerated(assertions);
+		generatorInterfaceBuilderProcessor.process(testClass);
 	}
 }
