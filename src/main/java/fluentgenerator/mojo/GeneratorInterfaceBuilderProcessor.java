@@ -18,13 +18,13 @@ import java.util.stream.Collectors;
 public class GeneratorInterfaceBuilderProcessor extends AbstractProcessor<CtClass<?>> {
 	private static Set<ModifierKind> PUBLIC = Collections.singleton(ModifierKind.PUBLIC);
 
-	private Consumer<CtInterface> interfaceConsumer = (consumer) -> {};
+	private Consumer<CtInterface<?>> interfaceConsumer = (consumer) -> {};
 
 	GeneratorInterfaceBuilderProcessor(Launcher launcher) {
 		setFactory(launcher.getFactory());
 	}
 
-	public void onInterfaceGenerated(Consumer<CtInterface> consumer) {
+	public void onInterfaceGenerated(Consumer<CtInterface<?>> consumer) {
 		this.interfaceConsumer = consumer;
 	}
 
@@ -49,7 +49,7 @@ public class GeneratorInterfaceBuilderProcessor extends AbstractProcessor<CtClas
 			String methodName = method.getSimpleName().substring(3);
 			methodName = methodName.substring(0, 1).toLowerCase() + methodName.substring(1);
 
-			CtTypeReference parameterType = method.getParameters().get(0).getType();
+			CtTypeReference parameterType = method.getParameters().get(0).getType().box();
 
 			CtTypeReference supplierType = getFactory().Code().createCtTypeReference(Supplier.class);
 			supplierType.addActualTypeArgument(parameterType);
@@ -61,7 +61,7 @@ public class GeneratorInterfaceBuilderProcessor extends AbstractProcessor<CtClas
 		fields.forEach(field -> {
 			String methodName = field.getSimpleName();
 
-			CtTypeReference<?> parameterType = field.getType();
+			CtTypeReference<?> parameterType = field.getType().box();
 
 			CtTypeReference supplierType = getFactory().Code().createCtTypeReference(Supplier.class);
 			supplierType.addActualTypeArgument(parameterType);
@@ -77,6 +77,7 @@ public class GeneratorInterfaceBuilderProcessor extends AbstractProcessor<CtClas
 		return ctClass.getAllMethods().stream()
 			.filter(method -> method.getSimpleName().startsWith("set"))
 			.filter(method -> method.getParameters().size() == 1)
+			.filter(method -> method.getModifiers().contains(ModifierKind.PUBLIC))
 			.collect(Collectors.toSet());
 	}
 
